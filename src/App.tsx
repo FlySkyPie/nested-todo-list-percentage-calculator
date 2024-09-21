@@ -7,7 +7,7 @@ import { useASTObject } from './hooks/use-ast-object';
 import styles from './styles.module.scss';
 
 function App() {
-  const [value, setValue] = useState("**Hello world!!!**");
+  const [value, setValue] = useState("- [ ] A Task");
   const { astObject } = useASTObject(value);
 
   return (
