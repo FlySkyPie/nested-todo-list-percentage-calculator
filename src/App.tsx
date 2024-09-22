@@ -4,11 +4,13 @@ import { JsonView, allExpanded, defaultStyles } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
 
 import { useASTObject } from './hooks/use-ast-object';
+import { useListPercentage } from './hooks/use-list-percentage';
 import styles from './styles.module.scss';
 
 function App() {
   const [value, setValue] = useState("- [ ] A Task");
-  const { astObject } = useASTObject(value);
+  const { astObject: root } = useASTObject(value);
+  const { astObject } = useListPercentage(root);
 
   return (
     <div className={styles.root}>
