@@ -3,7 +3,7 @@ import type {
     ListContent, Blockquote, FootnoteDefinition,
 } from '../../interfaces/mdast';
 
-type ListPlus = Omit<List, 'children'> & {
+export type ListPlus = Omit<List, 'children'> & {
     totalCount: number;
     checkedCount: number;
     percentage: number;
@@ -11,15 +11,15 @@ type ListPlus = Omit<List, 'children'> & {
     children: ListContent<ListPlus>[];
 }
 
-export abstract class ListItemCounter {
-    public static process = (root: Root<List>): Root<ListPlus> => {
+export abstract class PercentageIndicator {
+    public static process = (root: Root<ListPlus>): Root<ListPlus> => {
         return {
             ...root,
-            children: root.children.map(ListItemCounter.processRootContent),
+            children: root.children.map(PercentageIndicator.processRootContent),
         }
     };
 
-    private static processFootnoteDefinition = (node: FootnoteDefinition<List>, percentage: number): FootnoteDefinition<ListPlus> => {
+    private static processFootnoteDefinition = (node: FootnoteDefinition<ListPlus>): FootnoteDefinition<ListPlus> => {
         return {
             ...node,
             children: node.children.map(item => {
@@ -28,16 +28,16 @@ export abstract class ListItemCounter {
                 }
 
                 if (item.type === 'blockquote') {
-                    return ListItemCounter.processBlockquote(item, percentage);
+                    return PercentageIndicator.processBlockquote(item);
                 }
                 if (item.type === 'footnoteDefinition') {
-                    return ListItemCounter.processFootnoteDefinition(item, percentage);
+                    return PercentageIndicator.processFootnoteDefinition(item);
                 }
                 if (item.type === 'heading') {
                     return (item);
                 }
                 if (item.type === 'list') {
-                    return ListItemCounter.processList(item, percentage);
+                    return PercentageIndicator.processList(item);
                 }
                 if (item.type === 'paragraph') {
                     return item;
@@ -47,7 +47,7 @@ export abstract class ListItemCounter {
         };
     };
 
-    private static processBlockquote = (node: Blockquote<List>, percentage: number): Blockquote<ListPlus> => {
+    private static processBlockquote = (node: Blockquote<ListPlus>): Blockquote<ListPlus> => {
         return {
             ...node,
             children: node.children.map(item => {
@@ -56,74 +56,17 @@ export abstract class ListItemCounter {
                 }
 
                 if (item.type === 'blockquote') {
-                    return ListItemCounter.processBlockquote(item, percentage);
+                    return PercentageIndicator.processBlockquote(item);
                 }
                 if (item.type === 'footnoteDefinition') {
-                    return ListItemCounter.processFootnoteDefinition(item, percentage);
+                    return PercentageIndicator.processFootnoteDefinition(item);
                 }
                 if (item.type === 'heading') {
                     return (item);
                 }
 
                 if (item.type === 'list') {
-                    return ListItemCounter.processList(item, percentage);
-                }
-                if (item.type === 'paragraph') {
-                    return item;
-                }
-
-                return item;
-            }),
-        };
-    };
-
-    private static processList = (node: List, _percentage: number): ListPlus => {
-        const { children } = node;
-        let totalCount = 0;
-        let checkedCount = 0;
-
-        for (let index = 0; index < children.length; index++) {
-            const item = children[index];
-            if (item.checked !== null) {
-                totalCount++;
-            }
-            if (item.checked === true) {
-                checkedCount++;
-            }
-        }
-
-        const percentage = totalCount === 0 ? 1 :
-            _percentage / totalCount;
-
-        return {
-            ...node,
-            children: node.children.map((item) => ListItemCounter.processListItem(item, percentage)),
-            totalCount,
-            checkedCount,
-            percentage: _percentage * checkedCount / totalCount,
-        };
-    };
-
-    private static processListItem = (node: ListItem<List>, percentage: number): ListItem<ListPlus> => {
-        return {
-            ...node,
-            children: node.children.map(item => {
-                if (!item.children) {
-                    return item;
-                }
-
-                if (item.type === 'blockquote') {
-                    return ListItemCounter.processBlockquote(item, percentage);
-                }
-                if (item.type === 'footnoteDefinition') {
-                    return ListItemCounter.processFootnoteDefinition(item, percentage);
-                }
-                if (item.type === 'heading') {
-                    return (item);
-                }
-
-                if (item.type === 'list') {
-                    return ListItemCounter.processList(item, percentage);
+                    return PercentageIndicator.processList(item);
                 }
                 if (item.type === 'paragraph') {
                     return item;
@@ -134,9 +77,65 @@ export abstract class ListItemCounter {
         };
     };
 
-    private static processRootContent = (node: RootContent<List>): RootContent<ListPlus> => {
+    private static processList = (node: ListPlus): ListPlus => {
+        return {
+            ...node,
+            children: node.children.map((item) =>
+                PercentageIndicator.processListItem(item)),
+        };
+    };
+
+    private static processListItem = (node: ListItem<ListPlus>): ListItem<ListPlus> => {
+        const paragraph = node.children.find(item => item.type === 'paragraph');
+        const list = node.children.find(item => item.type === 'list');
+
+        return {
+            ...node,
+            children: node.children.map(item => {
+                if (!item.children) {
+                    return item;
+                }
+
+                if (item.type === 'blockquote') {
+                    return PercentageIndicator.processBlockquote(item);
+                }
+                if (item.type === 'footnoteDefinition') {
+                    return PercentageIndicator.processFootnoteDefinition(item);
+                }
+                if (item.type === 'heading') {
+                    return (item);
+                }
+
+                if (item.type === 'list') {
+                    return PercentageIndicator.processList(item);
+                }
+                if (item.type === 'paragraph') {
+                    if (!paragraph || !list) {
+                        return item;
+                    }
+
+                    if (paragraph === item) {
+                        return {
+                            ...item,
+                            children: [{
+                                type: 'text',
+                                value: `[${(list.percentage * 100).toFixed(0)}%] `,
+                            },
+                            ...item.children,],
+                        };
+                    }
+
+                    return item;
+                }
+
+                return item;
+            }),
+        };
+    };
+
+    private static processRootContent = (node: RootContent<ListPlus>): RootContent<ListPlus> => {
         if (node.type === 'list') {
-            return ListItemCounter.processList(node, 1.0);
+            return PercentageIndicator.processList(node);
         }
 
         if (!node.children) {
@@ -144,7 +143,7 @@ export abstract class ListItemCounter {
         }
 
         if (node.type === 'blockquote') {
-            return ListItemCounter.processBlockquote(node, 1.0);
+            return PercentageIndicator.processBlockquote(node);
         }
 
         if (node.type === 'delete') {
@@ -154,7 +153,7 @@ export abstract class ListItemCounter {
             return node;
         }
         if (node.type === 'footnoteDefinition') {
-            return ListItemCounter.processFootnoteDefinition(node, 1.0);
+            return PercentageIndicator.processFootnoteDefinition(node);
         }
         if (node.type === 'heading') {
             return node;
@@ -166,7 +165,7 @@ export abstract class ListItemCounter {
             return node;
         }
         if (node.type === 'listItem') {
-            return ListItemCounter.processListItem(node, 1.0);
+            return PercentageIndicator.processListItem(node);
         }
         if (node.type === 'paragraph') {
             return node;
